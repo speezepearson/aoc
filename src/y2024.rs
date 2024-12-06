@@ -1,5 +1,9 @@
 use nom::{bytes::complete::tag, IResult};
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+    time::SystemTime,
+};
 
 pub fn template() {
     let datastr = std::fs::read_to_string("pn.in.txt").unwrap();
@@ -414,3 +418,281 @@ pub fn p5() {
         println!("-----------------------------------");
     }
 }
+
+pub fn p6() {
+    let datastr = std::fs::read_to_string("p6.in.txt").unwrap();
+
+    type Posn = (usize, usize);
+    type Dir = (isize, isize);
+    #[derive(Debug, PartialEq, Eq)]
+    struct File {
+        guard_start: Posn,
+        blocks: HashSet<Posn>,
+        dims: (usize, usize),
+    }
+    let file = File {
+        guard_start: datastr
+            .lines()
+            .enumerate()
+            .find_map(|(i, line)| {
+                line.chars()
+                    .enumerate()
+                    .position(|(_, c)| c == '^')
+                    .map(|j| (i, j))
+            })
+            .unwrap(),
+        blocks: datastr
+            .lines()
+            .enumerate()
+            .flat_map(|(i, line)| {
+                line.chars()
+                    .enumerate()
+                    .filter_map(move |(j, c)| if c == '#' { Some((i, j)) } else { None })
+            })
+            .collect(),
+        dims: (
+            datastr.lines().count(),
+            datastr.lines().next().unwrap().len(),
+        ),
+    };
+    println!("file = {file:?}");
+    #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
+    struct State {
+        posn: Posn,
+        dir: Dir,
+    }
+
+    fn step(file: &File, state: &State) -> Option<State> {
+        let dest = add_posn(&state.posn, &state.dir, &file.dims)?;
+        if file.blocks.contains(&dest) {
+            Some(State {
+                posn: state.posn,
+                dir: rotate_90deg_right(&state.dir),
+            })
+        } else {
+            Some(State {
+                posn: dest,
+                dir: state.dir,
+            })
+        }
+    }
+
+    fn rotate_90deg_right(dir: &Dir) -> Dir {
+        (dir.1, -dir.0)
+    }
+    fn add_posn(old: &Posn, dir: &Dir, dims: &(usize, usize)) -> Option<Posn> {
+        match (
+            old.0.checked_add_signed(dir.0),
+            old.1.checked_add_signed(dir.1),
+        ) {
+            (Some(i), Some(j)) if i < dims.0 && j < dims.1 => Some((i, j)),
+            _ => None,
+        }
+    }
+
+    let start_state = State {
+        posn: file.guard_start,
+        dir: (-1, 0),
+    };
+
+    {
+        println!("-------------- part 1 -------------");
+        let mut state = start_state;
+        let mut history = vec![state];
+        while let Some(next) = step(&file, &state) {
+            state = next;
+            history.push(state);
+            println!("stepped to {state:?}");
+        }
+        let answer = history.iter().map(|s| s.posn).collect::<HashSet<_>>().len();
+        println!("{answer:?}");
+        println!("-----------------------------------");
+    }
+
+    {
+        println!("-------------- part 2 -------------");
+        let mut state = State {
+            posn: file.guard_start,
+            dir: (-1, 0),
+        };
+        let mut base_history = vec![state];
+        let mut loop_block_posns = HashSet::new();
+
+        let mut last_print: Option<SystemTime> = None;
+        while let Some(next) = step(&file, &state) {
+            if next.posn != state.posn
+                && !base_history.iter().any(|s| s.posn == next.posn)
+                && does_loop(&file, &next.posn, &state)
+            {
+                loop_block_posns.insert(next.posn);
+            }
+            state = next;
+            base_history.push(state);
+            let now = SystemTime::now();
+            match last_print {
+                Some(t) if now.duration_since(t).unwrap().as_millis() < 1000 => {}
+                _ => {
+                    let visited = base_history.iter().map(|s| s.posn).collect::<HashSet<_>>();
+                    println!(
+                        "{}",
+                        (0..file.dims.0)
+                            .map(|i| (0..file.dims.1)
+                                .map(|j| if (i, j) == file.guard_start {
+                                    "^"
+                                } else if loop_block_posns.contains(&(i, j)) {
+                                    "O"
+                                } else if file.blocks.contains(&(i, j)) {
+                                    "#"
+                                } else if visited.contains(&(i, j)) {
+                                    "."
+                                } else {
+                                    " "
+                                })
+                                .collect::<Vec<_>>()
+                                .join(""))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                            + "\n---------------------------------------"
+                    );
+                    last_print = Some(now);
+                }
+            }
+        }
+
+        fn does_loop(file: &File, extra: &Posn, start: &State) -> bool {
+            let file = File {
+                blocks: {
+                    let mut b = file.blocks.clone();
+                    b.insert(*extra);
+                    b
+                },
+                ..*file
+            };
+            let mut state = *start;
+            let mut history = HashSet::from([state]);
+            while let Some(next) = step(&file, &state) {
+                if history.contains(&next) {
+                    // println!("found loop!");
+                    // let visited = history.iter().map(|s| s.posn).collect::<HashSet<_>>();
+                    // println!(
+                    //     "{}",
+                    //     (0..file.dims.0)
+                    //         .map(|i| (0..file.dims.1)
+                    //             .map(|j| if (i, j) == start.posn {
+                    //                 match start.dir {
+                    //                     (-1, 0) => "^",
+                    //                     (1, 0) => "v",
+                    //                     (0, 1) => ">",
+                    //                     (0, -1) => "<",
+                    //                     _ => panic!("wat dir"),
+                    //                 }
+                    //             } else if &(i, j) == extra {
+                    //                 "O"
+                    //             } else if file.blocks.contains(&(i, j)) {
+                    //                 "#"
+                    //             } else if visited.contains(&(i, j)) {
+                    //                 "."
+                    //             } else {
+                    //                 " "
+                    //             })
+                    //             .collect::<Vec<_>>()
+                    //             .join(""))
+                    //         .collect::<Vec<_>>()
+                    //         .join("\n")
+                    //         + "\n---------------------------------------"
+                    // );
+                    return true;
+                }
+                state = next;
+                history.insert(state);
+            }
+            false
+        }
+
+        let visited = base_history.iter().map(|s| s.posn).collect::<HashSet<_>>();
+        println!(
+            "{}",
+            (0..file.dims.0)
+                .map(|i| (0..file.dims.1)
+                    .map(|j| if (i, j) == file.guard_start {
+                        "^"
+                    } else if loop_block_posns.contains(&(i, j)) {
+                        "O"
+                    } else if file.blocks.contains(&(i, j)) {
+                        "#"
+                    } else if visited.contains(&(i, j)) {
+                        "."
+                    } else {
+                        " "
+                    })
+                    .collect::<Vec<_>>()
+                    .join(""))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+
+        assert!(loop_block_posns.iter().all(|extra| does_loop(
+            &file,
+            extra,
+            base_history
+                .iter()
+                .find(|s| step(&file, s).unwrap().posn == *extra)
+                .unwrap()
+        )));
+
+        let answer = loop_block_posns.len();
+        println!("{answer:?}");
+        println!("-----------------------------------");
+    }
+}
+
+// struct BidiMap<'a, L, R> {
+//     // left: HashSet<&'a L>,
+//     // right: HashSet<&'a R>,
+//     fwd: HashMap<&'a L, &'a R>,
+//     bak: HashMap<&'a R, &'a L>,
+// }
+// impl<'a, L, R> BidiMap<'a, L, R>
+// where
+//     L: Hash + Eq,
+//     R: Hash + Eq,
+// {
+//     fn new() -> Self {
+//         Self {
+//             // left: HashSet::new(),
+//             // right: HashSet::new(),
+//             fwd: HashMap::new(),
+//             bak: HashMap::new(),
+//         }
+//     }
+//     fn get_fwd(&self, l: &L) -> Option<&R> {
+//         self.fwd.get(l).map(|&x| x)
+//     }
+//     fn get_bak(&self, r: &R) -> Option<&L> {
+//         self.bak.get(r).map(|&x| x)
+//     }
+//     fn add(&mut self, l: &'a L, r: &'a R) -> bool {
+//         if self.fwd.contains_key(l) || self.bak.contains_key(r) {
+//             false
+//         } else {
+//             // self.left.insert(l);
+//             // self.right.insert(r);
+//             self.fwd.insert(l, r);
+//             self.bak.insert(r, l);
+//             true
+//         }
+//     }
+// }
+// pub fn foo() {
+//     let mut m: BidiMap<String, String> = BidiMap::new();
+//     let s1 = "foo".to_string();
+//     let s2 = "bar".to_string();
+//     let s11 = "foo".to_string();
+//     m.add(&s1, &s2);
+//     println!(
+//         "{:?} {:?} {:?}",
+//         m.get_fwd(&s1),
+//         m.get_bak(&s2),
+//         m.get_fwd(&s11)
+//     );
+// }
