@@ -1,4 +1,6 @@
-use nom::{bytes::complete::tag, IResult};
+use itertools::{iproduct, repeat_n, Itertools};
+use nom::{bytes::complete::tag, IResult, InputIter};
+use num::integer::gcd;
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -641,6 +643,260 @@ pub fn p6() {
         )));
 
         let answer = loop_block_posns.len();
+        println!("{answer:?}");
+        println!("-----------------------------------");
+    }
+}
+
+pub fn p7() {
+    let datastr = std::fs::read_to_string("p7.in.txt").unwrap();
+    let data: Vec<(i64, Vec<i64>)> = datastr
+        .lines()
+        .map(|l| {
+            let (ans, args) = l.split_at(l.position(|c| c == ':').unwrap());
+            (
+                ans.parse().unwrap(),
+                args.trim()
+                    .strip_prefix(":")
+                    .unwrap()
+                    .split_whitespace()
+                    .map(|w| w.parse().unwrap())
+                    .collect(),
+            )
+        })
+        .collect();
+    // let data = vec![(9499727921208, vec![2, 5, 48, 82, 4, 678, 564, 49])];
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum Op {
+        Add,
+        Mul,
+        Concat,
+    }
+    impl std::fmt::Display for Op {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Add => f.write_str("+"),
+                Self::Mul => f.write_str("*"),
+                Self::Concat => f.write_str("|"),
+            }
+        }
+    }
+    impl Op {
+        fn call(&self, lhs: i64, rhs: i64) -> i64 {
+            match self {
+                Self::Add => lhs + rhs,
+                Self::Mul => lhs * rhs,
+                Self::Concat => vec![lhs.to_string(), rhs.to_string()]
+                    .join("")
+                    .parse()
+                    .unwrap(),
+            }
+        }
+    }
+
+    if false {
+        println!("-------------- part 1 -------------");
+
+        let mut answer = 0;
+        for (target, args) in &data {
+            println!("{}: {:?}", target, args);
+            for ops in repeat_n([Op::Add, Op::Mul].iter(), args.len() - 1).multi_cartesian_product()
+            {
+                let actual = args
+                    .iter()
+                    .skip(1)
+                    .zip(&ops)
+                    .fold(args[0], |acc, (&x, op)| op.call(acc, x));
+                if actual == *target {
+                    println!(
+                        "hit: {} = {} {}",
+                        target,
+                        args[0],
+                        args.iter()
+                            .skip(1)
+                            .zip(&ops)
+                            .map(|(n, op)| format!("{op} {n}"))
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    );
+                    answer += target;
+                    break;
+                }
+            }
+        }
+
+        println!("{answer:?}");
+        println!("-----------------------------------");
+    }
+
+    {
+        println!("-------------- part 2 -------------");
+
+        let mut answer = 0;
+        for (target, args) in &data {
+            println!("{target} {args:?}");
+            for ops in repeat_n([Op::Add, Op::Mul, Op::Concat].iter(), args.len() - 1)
+                .multi_cartesian_product()
+            {
+                // println!("");
+                let actual = args
+                    .iter()
+                    .skip(1)
+                    .zip(&ops)
+                    .fold(args[0], |acc, (&x, op)| {
+                        // println!("  {acc} {op} {x} = {}", op.call(acc, x));
+                        op.call(acc, x)
+                    });
+                if actual == *target {
+                    println!(
+                        "hit: {} = {} {}",
+                        target,
+                        args[0],
+                        args.iter()
+                            .skip(1)
+                            .zip(&ops)
+                            .map(|(n, op)| format!("{op} {n}"))
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    );
+                    answer += target;
+                    break;
+                }
+            }
+        }
+        println!("{answer:?}");
+        println!("-----------------------------------");
+    }
+}
+
+pub fn p8() {
+    let datastr = std::fs::read_to_string("p8.in.txt").unwrap();
+    // let datastr = std::fs::read_to_string("p8.test.txt").unwrap();
+    type Posn = (usize, usize);
+    type DPosn = (isize, isize);
+    let data: Vec<Vec<char>> = datastr
+        .lines()
+        .map(|l| l.trim().chars().collect())
+        .collect();
+    let dims = (data.len(), data[0].len());
+
+    let antenna_locs_by_freq: HashMap<char, HashSet<Posn>> = data
+        .iter()
+        .enumerate()
+        .flat_map(|(i, l)| {
+            l.iter()
+                .enumerate()
+                .filter_map(move |(j, &c)| if c == '.' { None } else { Some((i, j, c)) })
+        })
+        .fold(HashMap::new(), |mut m, (i, j, c)| {
+            m.entry(c).or_insert_with(HashSet::new).insert((i, j));
+            m
+        });
+    println!("antenna locs {antenna_locs_by_freq:?}");
+    println!(
+        "antenna counts {:?}",
+        antenna_locs_by_freq
+            .iter()
+            .map(|(&k, vs)| (k, vs.len()))
+            .collect_vec()
+    );
+
+    {
+        println!("-------------- part 1 -------------");
+        let mut antinode_locs: HashSet<Posn> = HashSet::new();
+        for (_, locs) in &antenna_locs_by_freq {
+            for (a, b) in iproduct!(locs, locs) {
+                if a == b {
+                    continue;
+                } else {
+                    match (
+                        b.0.checked_add_signed(b.0 as isize - a.0 as isize),
+                        b.1.checked_add_signed(b.1 as isize - a.1 as isize),
+                    ) {
+                        (Some(an0), Some(an1)) if an0 < dims.0 && an1 < dims.1 => {
+                            antinode_locs.insert((an0, an1));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        println!(
+            "{}",
+            data.iter()
+                .enumerate()
+                .map(|(i, l)| l
+                    .iter()
+                    .enumerate()
+                    .map(|(j, &c)| if antinode_locs.contains(&(i, j)) {
+                        "!".to_string()
+                    } else {
+                        c.to_string()
+                    })
+                    .collect_vec()
+                    .join(""))
+                .collect_vec()
+                .join("\n")
+        );
+        let answer = antinode_locs.len();
+        println!("{answer:?}");
+        println!("-----------------------------------");
+    }
+
+    {
+        println!("-------------- part 2 -------------");
+        let mut antinode_locs: HashSet<Posn> = HashSet::new();
+        for (_, locs) in &antenna_locs_by_freq {
+            if locs.len() > 1 {
+                for loc in locs {
+                    antinode_locs.insert(*loc);
+                }
+            }
+            for (a, b) in iproduct!(locs, locs) {
+                if a == b {
+                    continue;
+                }
+                let d = (b.0 as isize - a.0 as isize, b.1 as isize - a.1 as isize);
+                let d = (d.0 / gcd(d.0, d.1), d.1 / gcd(d.0, d.1));
+                for i in 0.. {
+                    let mut done = true;
+                    for sign in [-1, 1].iter() {
+                        match (
+                            a.0.checked_add_signed(sign * i * d.0),
+                            a.1.checked_add_signed(sign * i * d.1),
+                        ) {
+                            (Some(an0), Some(an1)) if an0 < dims.0 && an1 < dims.1 => {
+                                antinode_locs.insert((an0, an1));
+                                done = false;
+                            }
+                            _ => {}
+                        }
+                    }
+                    if done {
+                        break;
+                    }
+                }
+            }
+        }
+        println!(
+            "{}",
+            data.iter()
+                .enumerate()
+                .map(|(i, l)| l
+                    .iter()
+                    .enumerate()
+                    .map(|(j, &c)| if antinode_locs.contains(&(i, j)) {
+                        "!".to_string()
+                    } else {
+                        c.to_string()
+                    })
+                    .collect_vec()
+                    .join(""))
+                .collect_vec()
+                .join("\n")
+        );
+        let answer = antinode_locs.len();
         println!("{answer:?}");
         println!("-----------------------------------");
     }
