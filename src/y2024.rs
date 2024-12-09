@@ -952,3 +952,175 @@ pub fn p8() {
 //         m.get_fwd(&s11)
 //     );
 // }
+
+pub fn p9() {
+    let datastr = std::fs::read_to_string("p9.in.txt").unwrap();
+    let data: Vec<u8> = datastr
+        .trim()
+        .chars()
+        .map(|c| c.to_digit(10).unwrap() as u8)
+        .collect();
+
+    type Tape = Vec<Option<u64>>;
+
+    let tape: Tape = {
+        let mut tape = vec![];
+        let mut next_id = 0;
+        for (i, &size) in data.iter().enumerate() {
+            if i % 2 == 0 {
+                for _ in 0..size {
+                    tape.push(Some(next_id));
+                }
+                next_id += 1;
+            } else {
+                for _ in 0..size {
+                    tape.push(None);
+                }
+            }
+        }
+        tape
+    };
+    eprintln!("tape = {tape:?}");
+
+    {
+        println!("-------------- part 1 -------------");
+
+        fn compact(tape: &Tape) -> Tape {
+            let mut res = tape.clone();
+            let mut left = 0;
+            let mut right = tape.len() - 1;
+            while left < right {
+                // eprintln!("l={left}/{:?}, r={right}/{:?}", tape[left], tape[right]);
+                match (res[left], res[right]) {
+                    (None, Some(_)) => {
+                        res.swap(left, right);
+                    }
+                    (None, None) => right -= 1,
+                    (Some(_), _) => left += 1,
+                }
+            }
+            res
+        }
+
+        let compacted = compact(&tape);
+        eprintln!("compacted = {compacted:?}");
+
+        let answer: u64 = compacted
+            .iter()
+            .enumerate()
+            .map(|(i, id)| match id {
+                None => 0,
+                Some(id) => i as u64 * id,
+            })
+            .sum();
+        println!("{answer:?}");
+        println!("-----------------------------------");
+    }
+
+    {
+        println!("-------------- part 2 -------------");
+
+        let gaps: Vec<Vec<usize>> = {
+            let mut gaps: Vec<Vec<usize>> = (0..10).map(|_| vec![]).collect();
+            for chunk in tape
+                .iter()
+                .enumerate()
+                .collect::<Vec<_>>()
+                .chunk_by(|(_, a), (_, b)| a.is_none() == b.is_none())
+            {
+                if chunk[0].1.is_none() {
+                    gaps[chunk.len()].push(chunk[0].0)
+                }
+            }
+            gaps
+        };
+        eprintln!("gaps: {gaps:?}");
+
+        let mut working_copy = tape.clone();
+        let n_chunks = tape
+            .iter()
+            .enumerate()
+            .chunk_by(|(_, &id)| id)
+            .into_iter()
+            .filter_map(|(id, mut g)| match id {
+                Some(id) => Some((id, g.next().unwrap().0, g.count() + 1)),
+                None => None,
+            })
+            .count();
+        eprintln!(
+            "   {}",
+            working_copy
+                .iter()
+                .map(|id| id.map(|x| x.to_string()).unwrap_or(".".to_string()))
+                .collect_vec()
+                .join("")
+        );
+        let mut chunks_processed = 0;
+        let mut chunks_moved = 0;
+        for (_src_id, src_start, src_len) in tape
+            .iter()
+            .enumerate()
+            .chunk_by(|(_, &id)| id)
+            .into_iter()
+            .filter_map(|(id, mut g)| match id {
+                Some(id) => Some((id, g.next().unwrap().0, g.count() + 1)),
+                None => None,
+            })
+            .collect::<Vec<_>>()
+            .iter()
+            .rev()
+        {
+            let first_big_gap_start = working_copy
+                .iter()
+                .enumerate()
+                .chunk_by(|(_, &id)| id)
+                .into_iter()
+                .filter_map(|(id, mut group)| match id {
+                    None => {
+                        let start = group.next().unwrap().0;
+                        let len = group.count() + 1;
+                        if &start < src_start && &len >= src_len {
+                            Some(start)
+                        } else {
+                            None
+                        }
+                    }
+                    Some(_) => None,
+                })
+                .next();
+            match first_big_gap_start {
+                None => {}
+                Some(gap_start) => {
+                    for i in 0..*src_len {
+                        working_copy.swap(gap_start + i, src_start + i);
+                    }
+                    chunks_moved += 1;
+                    if chunks_moved % 1000 == 0 {
+                        eprintln!(
+                            "-> {}",
+                            working_copy
+                                .iter()
+                                .map(|id| id.map(|x| x.to_string()).unwrap_or(".".to_string()))
+                                .collect_vec()
+                                .join("")
+                        );
+                    }
+                }
+            }
+            eprintln!("processed {chunks_processed}/{n_chunks}");
+            chunks_processed += 1;
+        }
+        eprintln!("compacted = {working_copy:?}");
+
+        let answer: u64 = working_copy
+            .iter()
+            .enumerate()
+            .map(|(i, id)| match id {
+                None => 0,
+                Some(id) => i as u64 * id,
+            })
+            .sum();
+        println!("{answer:?}");
+        println!("-----------------------------------");
+    }
+}
