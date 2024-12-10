@@ -8,3 +8,39 @@ itertools = "0.13.0"
 nom = "7.1.3"
 num = "0.4.3"
 regex = "1.11.1"
+
+[[bin]]
+name = "24p01"
+path = "src/2024/01/main.rs"
+
+[[bin]]
+name = "24p02"
+path = "src/2024/02/main.rs"
+
+[[bin]]
+name = "24p03"
+path = "src/2024/03/main.rs"
+
+[[bin]]
+name = "24p04"
+path = "src/2024/04/main.rs"
+
+[[bin]]
+name = "24p05"
+path = "src/2024/05/main.rs"
+
+[[bin]]
+name = "24p06"
+path = "src/2024/06/main.rs"
+
+[[bin]]
+name = "24p07"
+path = "src/2024/07/main.rs"
+
+[[bin]]
+name = "24p08"
+path = "src/2024/08/main.rs"
+
+[[bin]]
+name = "24p09"
+path = "src/2024/09/main.rs"
