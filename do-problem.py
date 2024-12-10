@@ -10,7 +10,7 @@ args = parser.parse_args()
 
 import pathlib
 HERE = pathlib.Path(__file__).parent
-template = (HERE / 'src' / str(args.year) / 'template').relative_to(HERE)
+template = (HERE / 'src' / 'template').relative_to(HERE)
 assert template.is_dir()
 dst = (HERE / 'src' / format(args.year, '04d') / format(args.problem, '02d')).relative_to(HERE)
 assert not dst.exists()
@@ -21,18 +21,16 @@ shutil.copytree(template, dst)
 
 import subprocess
 
-input('Copy the test input, then hit Enter: ')
-subprocess.check_call(['pbpaste'], stdout=(dst/'test.txt').open('w'))
-input('Copy the real input, then hit Enter: ')
+input('Copy your problem input, then hit Enter: ')
 subprocess.check_call(['pbpaste'], stdout=(dst/'in.txt').open('w'))
 
 bin_name = f'{args.year-2000}p{args.problem}'
 
 open('Cargo.toml', 'a').write(f'''
-
 [[bin]]
 name = "{bin_name}"
-path = "{dst}/main.rs"''')
+path = "{dst}/main.rs"
+''')
 
 watch_cmd = ['cargo', 'watch', '-B1', '-x', f'run --bin {bin_name}']
 p = subprocess.Popen(watch_cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
