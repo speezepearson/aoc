@@ -1,10 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
+use aoc::grid::lookup_offset;
 use itertools::{iproduct, Itertools as _};
 use num::integer::gcd;
 
 fn main() {
-    let datastr = std::fs::read_to_string("p8.in.txt").unwrap();
+    let datastr = std::fs::read_to_string("src/2024/08/in.txt").unwrap();
     // let datastr = std::fs::read_to_string("p8.test.txt").unwrap();
     type Posn = (usize, usize);
     let data: Vec<Vec<char>> = datastr
@@ -42,14 +43,12 @@ fn main() {
                 if a == b {
                     continue;
                 } else {
-                    match (
-                        b.0.checked_add_signed(b.0 as isize - a.0 as isize),
-                        b.1.checked_add_signed(b.1 as isize - a.1 as isize),
+                    if let Some((antinode_loc, _)) = lookup_offset(
+                        b,
+                        &(b.0 as isize - a.0 as isize, b.1 as isize - a.1 as isize),
+                        &data,
                     ) {
-                        (Some(an0), Some(an1)) if an0 < dims.0 && an1 < dims.1 => {
-                            antinode_locs.insert((an0, an1));
-                        }
-                        _ => {}
+                        antinode_locs.insert(antinode_loc);
                     }
                 }
             }
@@ -94,15 +93,11 @@ fn main() {
                 for i in 0.. {
                     let mut done = true;
                     for sign in [-1, 1].iter() {
-                        match (
-                            a.0.checked_add_signed(sign * i * d.0),
-                            a.1.checked_add_signed(sign * i * d.1),
-                        ) {
-                            (Some(an0), Some(an1)) if an0 < dims.0 && an1 < dims.1 => {
-                                antinode_locs.insert((an0, an1));
-                                done = false;
-                            }
-                            _ => {}
+                        if let Some((antinode_loc, _)) =
+                            lookup_offset(&a, &(sign * i * d.0, sign * i * d.1), &data)
+                        {
+                            antinode_locs.insert(antinode_loc);
+                            done = false;
                         }
                     }
                     if done {

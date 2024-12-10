@@ -1,10 +1,10 @@
 use std::{collections::HashSet, time::SystemTime};
 
-fn main() {
-    let datastr = std::fs::read_to_string("p6.in.txt").unwrap();
+use aoc::grid::{add_posn, DPosn, Posn};
 
-    type Posn = (usize, usize);
-    type Dir = (isize, isize);
+fn main() {
+    let datastr = std::fs::read_to_string("src/2024/06/in.txt").unwrap();
+
     #[derive(Debug, PartialEq, Eq)]
     struct File {
         guard_start: Posn,
@@ -40,7 +40,7 @@ fn main() {
     #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
     struct State {
         posn: Posn,
-        dir: Dir,
+        dir: DPosn,
     }
 
     fn step(file: &File, state: &State) -> Option<State> {
@@ -58,17 +58,8 @@ fn main() {
         }
     }
 
-    fn rotate_90deg_right(dir: &Dir) -> Dir {
+    fn rotate_90deg_right(dir: &DPosn) -> DPosn {
         (dir.1, -dir.0)
-    }
-    fn add_posn(old: &Posn, dir: &Dir, dims: &(usize, usize)) -> Option<Posn> {
-        match (
-            old.0.checked_add_signed(dir.0),
-            old.1.checked_add_signed(dir.1),
-        ) {
-            (Some(i), Some(j)) if i < dims.0 && j < dims.1 => Some((i, j)),
-            _ => None,
-        }
     }
 
     let start_state = State {

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use aoc::grid::{take_step, Posn};
+use aoc::grid::{lookup_offset, Posn};
 use itertools::Itertools;
 
 type Height = u8;
@@ -127,7 +127,7 @@ fn part_1(data: &File) -> u64 {
                         } else {
                             aoc::grid::DIRS_4
                                 .iter()
-                                .filter_map(|step| take_step(&(i, j), &step, data))
+                                .filter_map(|step| lookup_offset(&(i, j), &step, data))
                                 .filter(|(_, nv)| **nv == height + 1)
                                 .filter_map(|(npos, _)| reachable_nines.get(&npos))
                                 .flat_map(|x| x)
@@ -162,7 +162,7 @@ fn part_2(data: &File) -> u64 {
                         } else {
                             aoc::grid::DIRS_4
                                 .iter()
-                                .filter_map(|step| take_step(&(i, j), step, data))
+                                .filter_map(|step| lookup_offset(&(i, j), step, data))
                                 .filter(|(_, nv)| **nv == height + 1)
                                 .filter_map(|(npos, _)| ratings.get(&npos))
                                 .sum()
